@@ -287,8 +287,17 @@
       <section id="tab-setup" class="tab-pane">
         <div class="setup-container">
           <div class="setup-header">
-            <h2>Weekly Availability & Plan Generator</h2>
-            <p>Tell Planly what days you are free each week and how many hours you can dedicate each day. We'll automatically schedule all 495 problems into a realistic roadmap.</p>
+            <h2 id="setup-title">Weekly Availability & Plan Generator</h2>
+            <p id="setup-subtitle">Tell Planly what days you are free each week and how many hours you can dedicate each day. We'll automatically schedule all 495 problems into a realistic roadmap.</p>
+          </div>
+
+          <!-- Active Plan Editing Notice Banner -->
+          <div id="setup-active-plan-banner" class="active-plan-edit-banner" style="display: none;">
+            <div class="active-plan-banner-icon">✏️</div>
+            <div class="active-plan-banner-text">
+              <strong>Editing Active Study Plan</strong>
+              <p>Adjust hours per day or toggle active days (e.g. switch to a 5-day plan). <strong>Your completed progress and all revision bookmarks are strictly preserved.</strong></p>
+            </div>
           </div>
 
           <!-- Quick Presets -->
@@ -296,6 +305,7 @@
             <label class="form-label">Quick Presets</label>
             <div class="preset-buttons">
               <button type="button" class="btn btn-secondary btn-sm" onclick="applyPreset('standard')">Student (Mon-Fri: 2h, Sat-Sun: 4h)</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="applyPreset('five_day')">5-Day Weekday (Mon-Fri: 2.5h, Sat-Sun: 0h)</button>
               <button type="button" class="btn btn-secondary btn-sm" onclick="applyPreset('pro')">Working Professional (Mon-Fri: 1.5h, Sat-Sun: 3.5h)</button>
               <button type="button" class="btn btn-secondary btn-sm" onclick="applyPreset('weekend')">Weekend Focused (Sat-Sun: 5h, Wed: 2h)</button>
               <button type="button" class="btn btn-secondary btn-sm" onclick="applyPreset('daily')">Daily Consistent (2h every day)</button>
@@ -475,8 +485,15 @@
 
             <!-- Start Date Picker & Projected End Date -->
             <div class="form-row date-row">
-              <div class="form-group">
-                <label for="plan-start-date" class="form-label">Plan Start Date</label>
+              <div class="form-group" id="group-apply-from" style="display: none;">
+                <label for="plan-apply-from" class="form-label">Apply Schedule Changes From</label>
+                <select id="plan-apply-from" class="form-input" onchange="handleApplyFromChange(this.value)">
+                  <option value="today">Today Onwards (Keeps past completed days intact)</option>
+                  <option value="start_date">Plan Start Date (Reschedule whole calendar)</option>
+                </select>
+              </div>
+              <div class="form-group" id="group-plan-start-date">
+                <label for="plan-start-date" class="form-label" id="label-plan-start-date">Plan Start Date</label>
                 <input type="date" id="plan-start-date" class="form-input" required onchange="recalculateAvailabilitySummary()" oninput="recalculateAvailabilitySummary()">
               </div>
               <div class="form-group">
@@ -497,6 +514,9 @@
               <button type="button" class="btn btn-danger btn-outline" id="btn-reset-plan" style="display: none;" onclick="openResetModal()">
                 Delete Current Plan
               </button>
+            </div>
+            <div id="setup-guarantee-note" class="setup-guarantee-note" style="display: none;">
+              🔒 <strong>Progress &amp; Revisions Protected:</strong> Solved problems stay solved and revision bookmarks are never unmarked.
             </div>
           </form>
         </div>

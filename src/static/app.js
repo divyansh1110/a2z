@@ -59,7 +59,9 @@ async function loadPlanData() {
     renderPlanStatus();
 
     if (appState.hasPlan && appState.plan) {
-      appState.syllabus = null;
+      if (!appState.syllabus) {
+        loadSyllabusFallback();
+      }
       document.getElementById("stats-bar").style.display = "grid";
       document.getElementById("btn-reset-plan").style.display = "inline-flex";
       const btnResetProgressSetup = document.getElementById("btn-reset-progress-setup");
@@ -129,7 +131,54 @@ function renderPlanStatus() {
     if (btnResetProgressSetup) btnResetProgressSetup.style.display = "none";
     if (resetStatLink) resetStatLink.style.display = "none";
     pausedBanner.style.display = "none";
+
+    const setupTitle = document.getElementById("setup-title");
+    const setupSubtitle = document.getElementById("setup-subtitle");
+    const setupBanner = document.getElementById("setup-active-plan-banner");
+    const groupApplyFrom = document.getElementById("group-apply-from");
+    const setupGuaranteeNote = document.getElementById("setup-guarantee-note");
+    const btnSubmit = document.getElementById("btn-submit-plan");
+    const btnNewPlan = document.getElementById("btn-new-plan");
+
+    if (setupTitle) setupTitle.textContent = "Weekly Availability & Plan Generator";
+    if (setupSubtitle) setupSubtitle.textContent = "Tell Planly what days you are free each week and how many hours you can dedicate each day. We'll automatically schedule all 495 problems into a realistic roadmap.";
+    if (setupBanner) setupBanner.style.display = "none";
+    if (groupApplyFrom) groupApplyFrom.style.display = "none";
+    if (setupGuaranteeNote) setupGuaranteeNote.style.display = "none";
+    if (btnSubmit) btnSubmit.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Generate & Start Study Plan`;
+    if (btnNewPlan) btnNewPlan.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New Schedule`;
+
+    const startDateLabel = document.getElementById("label-plan-start-date");
+    const startDateInput = document.getElementById("plan-start-date");
+    if (startDateLabel) startDateLabel.textContent = "Plan Start Date";
+    if (startDateInput) {
+      startDateInput.readOnly = false;
+      startDateInput.style.pointerEvents = "auto";
+      startDateInput.title = "";
+    }
     return;
+  }
+
+  // Active Plan UI Adjustments
+  const setupTitle = document.getElementById("setup-title");
+  const setupSubtitle = document.getElementById("setup-subtitle");
+  const setupBanner = document.getElementById("setup-active-plan-banner");
+  const groupApplyFrom = document.getElementById("group-apply-from");
+  const setupGuaranteeNote = document.getElementById("setup-guarantee-note");
+  const btnSubmit = document.getElementById("btn-submit-plan");
+  const btnNewPlan = document.getElementById("btn-new-plan");
+
+  if (setupTitle) setupTitle.textContent = "Edit Weekly Availability & Schedule";
+  if (setupSubtitle) setupSubtitle.textContent = "Adjust your study hours or change active days (e.g. switch to a 5-day plan). Your completed progress and all revision bookmarks will be strictly preserved.";
+  if (setupBanner) setupBanner.style.display = "flex";
+  if (groupApplyFrom) groupApplyFrom.style.display = "flex";
+  if (setupGuaranteeNote) setupGuaranteeNote.style.display = "block";
+  if (btnSubmit) btnSubmit.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Save & Update Schedule`;
+  if (btnNewPlan) btnNewPlan.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Availability & Hours`;
+
+  const applyFromSelect = document.getElementById("plan-apply-from");
+  if (applyFromSelect) {
+    handleApplyFromChange(applyFromSelect.value);
   }
 
   if (btnResetProgress) btnResetProgress.style.display = "inline-flex";
@@ -575,6 +624,28 @@ async function toggleTodayComplete() {
   }
 }
 
+// Calculate 1-based week number strictly from Monday to Sunday
+function computeWeekNumber(dateStr, startDateStr) {
+  if (!dateStr || !startDateStr) return 1;
+  const parseLocalDate = (str) => {
+    const parts = String(str).split('T')[0].split('-').map(Number);
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  };
+  const d = parseLocalDate(dateStr);
+  const start = parseLocalDate(startDateStr);
+  if (isNaN(d.getTime()) || isNaN(start.getTime())) return 1;
+
+  const startDayOfWeek = (start.getDay() + 6) % 7;
+  const startMonday = new Date(start.getFullYear(), start.getMonth(), start.getDate() - startDayOfWeek);
+
+  const curDayOfWeek = (d.getDay() + 6) % 7;
+  const curMonday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - curDayOfWeek);
+
+  const diffTime = curMonday.getTime() - startMonday.getTime();
+  const diffDays = Math.round(diffTime / 86400000);
+  return Math.floor(diffDays / 7) + 1;
+}
+
 // Format date range for a week
 function formatWeekDateRange(startDateStr, endDateStr) {
   if (!startDateStr || !endDateStr) return "";
@@ -679,8 +750,9 @@ function renderScheduleView() {
 
   // Group all schedule days into weeks
   const weeksMap = new Map();
+  const scheduleStartDate = schedule.length > 0 ? schedule[0].date : null;
   schedule.forEach((day, index) => {
-    const weekNum = day.week_number || (Math.floor(index / 7) + 1);
+    const weekNum = day.week_number || computeWeekNumber(day.date, scheduleStartDate);
     day.week_number = weekNum;
 
     if (!weeksMap.has(weekNum)) {
@@ -828,8 +900,9 @@ function expandAllWeeks() {
 function collapseAllWeeks() {
   if (!appState.collapsedWeeks) appState.collapsedWeeks = new Set();
   if (appState.plan && appState.plan.schedule) {
+    const scheduleStartDate = appState.plan.schedule.length > 0 ? appState.plan.schedule[0].date : null;
     appState.plan.schedule.forEach((day, index) => {
-      const wNum = day.week_number || (Math.floor(index / 7) + 1);
+      const wNum = day.week_number || computeWeekNumber(day.date, scheduleStartDate);
       appState.collapsedWeeks.add(wNum);
     });
   }
@@ -921,13 +994,13 @@ function renderTopicsView() {
     return;
   }
 
-  // Gather problems: from plan.schedule if available, or from syllabus fallback
-  const allProblems = [];
+  // Build lookup of scheduled problems from plan.schedule
+  const schedMap = new Map();
   if (hasPlan && appState.plan.schedule) {
     appState.plan.schedule.forEach(day => {
       if (day.type === "study" && day.problems) {
         day.problems.forEach(p => {
-          allProblems.push({
+          schedMap.set(p.uid, {
             ...p,
             day_number: day.day_number,
             scheduled_date: day.date
@@ -935,15 +1008,30 @@ function renderTopicsView() {
         });
       }
     });
-  } else if (appState.syllabus && appState.syllabus.problems) {
+  }
+
+  // Gather problems: comprehensive syllabus augmented with schedule metadata
+  const allProblems = [];
+  if (appState.syllabus && appState.syllabus.problems) {
     appState.syllabus.problems.forEach(p => {
-      allProblems.push({
-        ...p,
-        completed: false,
-        day_number: null,
-        scheduled_date: null
-      });
+      const scheduled = schedMap.get(p.uid);
+      if (scheduled) {
+        allProblems.push({
+          ...p,
+          ...scheduled
+        });
+      } else {
+        allProblems.push({
+          ...p,
+          completed: false,
+          day_number: null,
+          scheduled_date: null
+        });
+      }
     });
+  } else if (hasPlan && appState.plan.schedule) {
+    schedMap.forEach(item => allProblems.push(item));
+    loadSyllabusFallback();
   }
 
   // Group problems by topic and subtopic: topicName -> Map(subtopicName -> [problems])
@@ -1416,8 +1504,12 @@ function recalculateAvailabilitySummary() {
   if (summaryWeeklyHrs) summaryWeeklyHrs.textContent = `${totalHours.toFixed(1)} Hours`;
   if (summaryActiveDays) summaryActiveDays.textContent = `${activeDays} Days`;
 
+  const applyFromSelect = document.getElementById("plan-apply-from");
   const startDateInput = document.getElementById("plan-start-date");
-  const startDate = (startDateInput && startDateInput.value) ? startDateInput.value : appState.todayDate;
+  let startDate = (startDateInput && startDateInput.value) ? startDateInput.value : appState.todayDate;
+  if (appState.hasPlan && applyFromSelect && applyFromSelect.value === "today") {
+    startDate = appState.todayDate;
+  }
 
   if (totalHours <= 0) {
     if (summaryEstWeeks) summaryEstWeeks.textContent = "Select at least 1 day";
@@ -1453,6 +1545,7 @@ function recalculateAvailabilitySummary() {
 function applyPreset(name) {
   const presets = {
     standard: { Monday: 2.0, Tuesday: 2.0, Wednesday: 2.0, Thursday: 2.0, Friday: 2.0, Saturday: 4.0, Sunday: 4.0 },
+    five_day: { Monday: 2.5, Tuesday: 2.5, Wednesday: 2.5, Thursday: 2.5, Friday: 2.5, Saturday: 0.0, Sunday: 0.0 },
     pro: { Monday: 1.5, Tuesday: 1.5, Wednesday: 1.5, Thursday: 1.5, Friday: 1.5, Saturday: 3.5, Sunday: 3.5 },
     weekend: { Monday: 0.0, Tuesday: 0.0, Wednesday: 2.0, Thursday: 0.0, Friday: 0.0, Saturday: 5.0, Sunday: 5.0 },
     daily: { Monday: 2.0, Tuesday: 2.0, Wednesday: 2.0, Thursday: 2.0, Friday: 2.0, Saturday: 2.0, Sunday: 2.0 }
@@ -1476,7 +1569,30 @@ function applyPreset(name) {
     toggleDayEnabled(d);
     syncHours(d, input ? input.value : hrs);
   });
-  showToast(`Applied preset: ${name}`);
+  showToast(`Applied preset: ${name === 'five_day' ? '5-Day Weekday' : name}`);
+}
+
+function handleApplyFromChange(val) {
+  const startDateLabel = document.getElementById("label-plan-start-date");
+  const startDateInput = document.getElementById("plan-start-date");
+  if (val === "today") {
+    if (startDateLabel) startDateLabel.textContent = "Current Date (Reference)";
+    if (startDateInput) {
+      startDateInput.value = appState.todayDate;
+      startDateInput.readOnly = true;
+      startDateInput.style.pointerEvents = "none";
+      startDateInput.title = "Schedule changes apply from today onwards. Past completed days remain preserved.";
+    }
+  } else {
+    if (startDateLabel) startDateLabel.textContent = "Plan Start Date";
+    if (startDateInput) {
+      startDateInput.value = (appState.plan && appState.plan.start_date) ? appState.plan.start_date : appState.todayDate;
+      startDateInput.readOnly = false;
+      startDateInput.style.pointerEvents = "auto";
+      startDateInput.title = "Choose the date from which to reschedule the full plan.";
+    }
+  }
+  recalculateAvailabilitySummary();
 }
 
 function syncFormWithSavedAvailability() {
@@ -1485,7 +1601,14 @@ function syncFormWithSavedAvailability() {
 
   if (appState.plan.start_date) {
     const startDateInput = document.getElementById("plan-start-date");
-    if (startDateInput) startDateInput.value = appState.plan.start_date;
+    const applyFromSelect = document.getElementById("plan-apply-from");
+    if (startDateInput) {
+      if (applyFromSelect && applyFromSelect.value === "today") {
+        startDateInput.value = appState.todayDate;
+      } else {
+        startDateInput.value = appState.plan.start_date;
+      }
+    }
   }
 
   if (appState.plan.target_completion_date) {
@@ -1500,7 +1623,7 @@ function syncFormWithSavedAvailability() {
       planEndDate.value = `${formatted}${studyDaysText}`;
     }
     if (summaryEstWeeks && appState.plan.total_calendar_days) {
-      const weeks = Math.round(appState.plan.total_calendar_days / 7.0);
+      const weeks = appState.plan.total_weeks || Math.round(appState.plan.total_calendar_days / 7.0);
       summaryEstWeeks.textContent = `~${weeks} Weeks (${appState.plan.total_calendar_days} days)`;
     }
   }
@@ -1522,7 +1645,7 @@ function syncFormWithSavedAvailability() {
   });
 }
 
-// Handle Create Plan Form Submission
+// Handle Create / Update Plan Form Submission
 async function handleCreatePlan(e) {
   e.preventDefault();
 
@@ -1546,32 +1669,57 @@ async function handleCreatePlan(e) {
   const startDate = document.getElementById("plan-start-date").value || appState.todayDate;
   const btn = document.getElementById("btn-submit-plan");
   btn.disabled = true;
-  btn.textContent = "Generating Schedule...";
+
+  const isUpdating = Boolean(appState.hasPlan);
+  btn.textContent = isUpdating ? "Updating Schedule..." : "Generating Schedule...";
 
   try {
-    const res = await fetch("/api/create-plan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        weekly_availability: availability,
-        start_date: startDate
-      })
-    });
+    let res;
+    if (isUpdating) {
+      const applyFromSelect = document.getElementById("plan-apply-from");
+      let fromDate = appState.todayDate;
+      if (applyFromSelect && applyFromSelect.value === "start_date") {
+        fromDate = document.getElementById("plan-start-date").value || appState.todayDate;
+      }
+
+      res = await fetch("/api/update-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weekly_availability: availability,
+          from_date: fromDate
+        })
+      });
+    } else {
+      res = await fetch("/api/create-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weekly_availability: availability,
+          start_date: startDate
+        })
+      });
+    }
+
     const data = await res.json();
 
     if (data.success) {
-      showToast("Plan created successfully! Let's get started!");
+      showToast(isUpdating ? "Plan updated! Solved problems and revision marks preserved." : "Plan created successfully! Let's get started!");
       await loadPlanData();
       switchTab("tab-today");
     } else {
-      showToast(data.error || "Failed to generate plan", true);
+      showToast(data.error || "Failed to process plan", true);
     }
   } catch (err) {
-    console.error("Error creating plan:", err);
-    showToast("Server error while generating plan", true);
+    console.error("Error creating/updating plan:", err);
+    showToast("Server error while processing plan", true);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Generate & Start Study Plan`;
+    if (isUpdating) {
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Save & Update Schedule`;
+    } else {
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Generate & Start Study Plan`;
+    }
   }
 }
 

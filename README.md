@@ -20,15 +20,42 @@ d:\project\a2z\
 │   │   └── style.css                 # Clean modern dark theme
 │   ├── templates\
 │   │   └── index.html                # Single-page UI
+│   ├── planner\                      # Modular study planning engine
+│   │   ├── __init__.py               # Re-exports public planner interface
+│   │   ├── calendar_utils.py         # Monday-to-Sunday week number calculations
+│   │   ├── generator.py              # Initial study schedule generation
+│   │   ├── metrics.py                # Progress metrics & focus day calculations
+│   │   ├── recalculator.py           # Real-time ahead-of-schedule dynamic forward fill
+│   │   ├── rescheduler.py            # Plan availability updates & realignment
+│   │   └── syllabus.py               # Syllabus loader & duration parsing
+│   ├── routes\                       # Modular Flask blueprints
+│   │   ├── __init__.py               # Blueprint registration
+│   │   ├── plan_routes.py            # Plan creation, editing, pause, resume, reset
+│   │   ├── problem_routes.py         # Today view, toggle problem, revision bookmarks
+│   │   ├── status_routes.py          # MongoDB connectivity & health status
+│   │   ├── syllabus_routes.py        # Syllabus tree API with caching
+│   │   └── views.py                  # HTML template view
+│   ├── storage\                      # Modular MongoDB persistence layer
+│   │   ├── __init__.py               # Re-exports PlanlyMongoStorage
+│   │   ├── availability_ops.py       # Availability updates & progress sync
+│   │   ├── connection.py             # Mongo connection lifecycle & engine info
+│   │   ├── mongo_storage.py          # Unified PlanlyMongoStorage coordinator
+│   │   ├── plan_ops.py               # Plan document CRUD operations
+│   │   ├── progress_ops.py           # Problem status, revisions & progress reset
+│   │   └── slugs.py                  # Syllabus problem slug mapping with cache
 │   ├── __init__.py
-│   ├── app.py                        # Flask routes & REST APIs
+│   ├── app.py                        # Lightweight Flask application factory
 │   ├── config.py                     # Environment variables loader
-│   ├── logger.py                     # Rotating file logger (writes to logs/app.log)
-│   ├── planner.py                    # Syllabus scheduling & realignment algorithms
-│   └── storage.py                    # Pure MongoDB storage configured via .env
-├── tests\
-│   └── test_planly.py                # Unit and integration test suite
-├── run.py                            # Application entry point
+│   └── logger.py                     # Rotating file logger (writes to logs/app.log)
+├── tests\                            # Modular unit and integration test suite
+│   ├── test_api.py                   # REST API route tests
+│   ├── test_logger.py                # Logger file verification
+│   ├── test_planner.py               # Planner algorithms & dynamic recalculation
+│   ├── test_planly.py                # Master test suite runner
+│   └── test_storage.py               # MongoDB storage & progress tests
+├── extract_topics.py                 # Syllabus scraping utility
+├── main.py                           # Application entry point
+├── run.py                            # Runner script
 ├── pyproject.toml
 └── README.md
 ```
@@ -51,10 +78,12 @@ FLASK_DEBUG=True
 
 ## ✨ Features
 
-- **Weekly Availability Scheduler**:
+- **Weekly Availability Scheduler & Live Plan Editing**:
   - Configure which days of the week you are free (Monday through Sunday).
   - Set how many hours you can commit on each active day.
   - Automatically schedules all **495 problems** across active study days, with designated rest days.
+  - **Edit Plan Anytime**: Easily modify daily hours or switch availability (e.g., convert a 7-day plan into a 5-day weekday plan by toggling off weekends).
+  - **Zero Progress Loss Guarantee**: All completed problems and all revision marks are strictly preserved when editing hours or rescheduling days. Under no circumstance are bookmarked revision questions unmarked.
 
 - **Daily Focus View**:
   - Displays the exact topics and problems scheduled for today.

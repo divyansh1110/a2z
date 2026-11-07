@@ -1,20 +1,29 @@
+"""
+Utility script to extract Striver's A2Z DSA sheet syllabus payload
+from takeuforward.org and export to data/full_dsa_sheet_syllabus.json.
+"""
+
 import urllib.request
 import re
 import json
 import os
 
-def extract_all():
-    url = "https://takeuforward.org/prep-hub/strivers-a2z-dsa-sheet?page=sheet"
+DEFAULT_URL = "https://takeuforward.org/prep-hub/strivers-a2z-dsa-sheet?page=sheet"
+DEFAULT_TARGET_PATH = os.path.join("data", "full_dsa_sheet_syllabus.json")
+
+
+def fetch_syllabus_html(url=DEFAULT_URL):
+    """Fetch HTML content with standard user agent header."""
     req = urllib.request.Request(
         url,
         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     )
-    html = urllib.request.urlopen(req).read().decode("utf-8")
+    return urllib.request.urlopen(req).read().decode("utf-8")
 
-    # Locate the embedded flight payload containing sheet_syllabus
+
+def extract_flight_payload(html):
+    """Extract and decode Next.js flight payload containing sheet_syllabus."""
     scripts = re.findall(r'<script>(self\.__next_f\.push\(.*?\))</script>', html, re.DOTALL)
-    syllabus_obj = None
-
     for s in scripts:
         m = re.match(r'self\.__next_f\.push\(\[\d+,\s*"(.*)"\]\)', s, re.DOTALL)
         if m and "sheet_syllabus" in m.group(1):
@@ -23,11 +32,12 @@ def extract_all():
             if idx != -1:
                 sub = decoded[idx + len('"sheet_syllabus":'):]
                 syllabus_obj, _ = json.JSONDecoder().raw_decode(sub)
-                break
+                return syllabus_obj
+    raise ValueError("Could not find sheet_syllabus payload in page")
 
-    if not syllabus_obj:
-        raise ValueError("Could not find sheet_syllabus payload in page")
 
+def build_syllabus_tree(syllabus_obj):
+    """Transform raw Next.js tabular rows into structured topic & problem tree."""
     fields = syllabus_obj["fields"]
     rows = syllabus_obj["rows"]
     roots = syllabus_obj["roots"]
@@ -87,12 +97,24 @@ def extract_all():
 
         full_tree.append(topic_full)
 
-    os.makedirs("data", exist_ok=True)
-    target_path = os.path.join("data", "full_dsa_sheet_syllabus.json")
-    with open(target_path, "w", encoding="utf-8") as f:
-        json.dump(full_tree, f, indent=2, ensure_ascii=False)
+    return full_tree
 
-    print(f"Successfully exported {len(full_tree)} topics to {target_path}")
+
+def export_syllabus_json(tree, target_path=DEFAULT_TARGET_PATH):
+    """Write topic tree to JSON file."""
+    os.makedirs(os.path.dirname(target_path) or ".", exist_ok=True)
+    with open(target_path, "w", encoding="utf-8") as f:
+        json.dump(tree, f, indent=2, ensure_ascii=False)
+
+
+def extract_all():
+    """Download, parse, and export full syllabus."""
+    html = fetch_syllabus_html()
+    payload = extract_flight_payload(html)
+    tree = build_syllabus_tree(payload)
+    export_syllabus_json(tree)
+    print(f"Successfully exported {len(tree)} topics to {DEFAULT_TARGET_PATH}")
+
 
 if __name__ == "__main__":
     extract_all()
